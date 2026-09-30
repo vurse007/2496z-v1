@@ -1,43 +1,72 @@
-use vexide::smart::motor::BrakeMode; //importing the modules that we need
-use vexide::math::Angle;
 use vexide::prelude::*;
 
-pub struct motorGroup { //new struct for groups of motors
-    motors: Vec<Motor>
+use crate::global::{MotorGroup, SharedImu};
+use crate::pid::PID;
+
+pub struct Drivetrain {
+    pub left: MotorGroup,
+    pub right: MotorGroup,
+    pub imu: SharedImu,
+    pub heading_pid: PID,
+    pub turn_pid: PID,
+    pub drive_pid: PID,
+    pub target_heading: f64, //used by the pid functions
 }
 
-impl motorGroup{ //all the functions related to motor groups
-    pub fn new(motors: Vec<Motor>) -> Self { //constructor -> making new motor groups
-        Self {motors}
+impl Drivetrain {
+    pub fn new(left: MotorGroup, right: MotorGroup, imu: SharedImu, heading_pid: PID, turn_pid: PID, drive_pid: PID) -> Self {
+        Self { left, right, imu, heading_pid, turn_pid, drive_pid, target_heading: 0.0 }
     }
 
-    pub fn setBrakeMode(&mut self, mode: BrakeMode ){ //&mut means we are allowed to modify the variable/object
-        for m in &mut self.motors { //self tells the code that we are going to make these changes to whatever object's motors this function is called on
-            let _ = m.brake(mode); //underscore means i dont care what this value is, don't store it -> setting the brake mode returns a value (usually t/f for successful or not) but we don't need it so we're going to tell rust to disregard it
-        }
+    //inputs are -1.0 to 1.0 (like joystick values)
+    pub fn tank(&mut self, left: f64, right: f64) {
+        self.left.set_voltage(left.clamp(-1.0, 1.0) * 12.0);
+        self.right.set_voltage(right.clamp(-1.0, 1.0) * 12.0);
     }
 
-    pub fn setVoltage(&mut self, volts:f64){
-        for m in &mut self.motors {
-            let _ = m.set_voltage(volts);
-        }
+    pub fn split_arcade(&mut self, forward: f64, turn: f64) {
+        self.left.set_voltage((forward + turn).clamp(-1.0, 1.0) * 12.0);
+        self.right.set_voltage((forward - turn).clamp(-1.0, 1.0) * 12.0);
     }
 
-    pub fn tare(&mut self){
-        for m in &mut self.motors {
-            let _ = m.set_position(Angle::from_degrees(0.0));
-        }
+    //only remembers the mode -> it's applied when stop() is called
+    pub fn set_brake_mode(&mut self, mode: vexide::smart::motor::BrakeMode) {
+        self.left.set_brake_mode(mode);
+        self.right.set_brake_mode(mode);
     }
 
-    pub fn avgPosition(&self) -> f64 {
-        if self.motors.is_empty() {return 0.0;}
-        let mut sum = 0.0;
-        let mut count = 0;
-        for m in self.motors{
-            if !Ok(m) {continue}
-            sum += m.position().unwrap().as_degrees();
-            count++;
-        }
-        sum / count as f64
+    //inputs are volts, -12.0 to 12.0
+    pub fn move_raw(&mut self, left: f64, right: f64) {
+        self.left.set_voltage(left);
+        self.right.set_voltage(right);
+    }
+
+    pub fn tare(&mut self) {
+        self.right.tare();
+        self.left.tare();
+    }
+
+    pub fn get_left_pos(&self) -> f64 {
+        self.left.get_avg_pos()
+    }
+
+    pub fn get_right_pos(&self) -> f64 {
+        self.right.get_avg_pos()
+    }
+
+    pub fn get_avg_pos(&self) -> f64 {
+        (self.get_left_pos() + self.get_right_pos()) / 2.0
+    }
+
+    //heading in degrees [0, 360), None if the imu is unplugged or calibrating
+    //everything should read heading through here -> when odometry exists, this can read from it instead
+    pub fn get_heading(&self) -> Option<f64> {
+        self.imu.borrow().heading().ok().map(|h| h.as_degrees())
+    }
+
+    //stops using the brake mode set with set_brake_mode
+    pub fn stop(&mut self) {
+        self.left.brake();
+        self.right.brake();
     }
 }
