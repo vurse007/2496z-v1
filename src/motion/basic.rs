@@ -53,6 +53,37 @@ impl Drivetrain {
     }
 
     pub async fn straight(&mut self, _distance: f64, _timeout: u64, _scale: f64) {
-        //minsung or vihaan
+        self.drive_pid.reset();
+
+        let mut safety_timer = Timer::new(timeout);
+        safety_timer.start(None);
+
+        loop {
+            let Some(current_distance) = self.get_distance() else {
+                break;
+
+            let distance_error = distance - (current_distance - start_distance);
+            let drive_speed = self.drive_pid.calculate(distance_error, 0.0, scale);
+            self.move_raw(drive_speed, drive_speed);
+
+            if distance_error.abs() < self.drive_pid.settle_range { 
+                if !self.drive_pid.settle_timer.is_running() {
+                    self.drive_pid.settle_timer.start(None);
+                }
+            } else if self.drive_pid.settle_timer.is_running() {
+                self.drive_pid.settle_timer.stop();
+            }
+
+            if self.drive_pid.settle_timer.is_running() && self.drive_pid.settle_timer.elapsed() > self.drive_pid.settle_time {
+                break;
+            }
+
+            if safety_timer.is_done() {
+                break;
+            }
+
+            sleep(Duration::from_millis(self.drive_pid.dt)).await;
+        }
+        self.stop();         
     }
 }
