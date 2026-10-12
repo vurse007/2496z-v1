@@ -52,21 +52,28 @@ impl Drivetrain {
         self.turn_abs(target_heading, timeout, scale).await;
     }
 
-    pub async fn straight(&mut self, _distance: f64, _timeout: u64, _scale: f64) {
+    pub async fn straight(&mut self, distance: f64, timeout: u64, scale: f64) {
         self.drive_pid.reset();
+
+        let Some(start_distance) = self.get_avg_pos() else {
+            return;
+        };
 
         let mut safety_timer = Timer::new(timeout);
         safety_timer.start(None);
 
         loop {
-            let Some(current_distance) = self.get_distance() else {
+            let Some(current_distance) = self.get_avg_pos() else { //vv next time check the name of the function under the robot object -> you called it get_distance() but it's actually called get_avg_pos()
                 break;
+            };
 
-            let distance_error = distance - (current_distance - start_distance);
-            let drive_speed = self.drive_pid.calculate(distance_error, 0.0, scale);
-            self.move_raw(drive_speed, drive_speed);
+            //let distance_error = distance - (current_distance - start_distance);
+            let drive_speed = self.drive_pid.calculate(distance, current_distance - start_distance, scale); //for this one we can do something that makes a little more sense:
+            self.move_raw(drive_speed, drive_speed); //the second paramater of calculate is current position, so let's replace that with (current_distance - start_distance), & then we can make the first param just the distance
 
-            if distance_error.abs() < self.drive_pid.settle_range { 
+            //making unnecessary variables isn't bad but it can be confusing and technically code runs ever so slightly faster if you don't make unnecessary things -> js a good practice to have when you deal with bigger sized variables/things
+            
+            if (distance - (current_distance - start_distance)).abs() < self.drive_pid.settle_range { 
                 if !self.drive_pid.settle_timer.is_running() {
                     self.drive_pid.settle_timer.start(None);
                 }

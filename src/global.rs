@@ -43,25 +43,20 @@ impl MotorGroup{ //all the functions related to motor groups
         }
     }
 
-    pub fn get_avg_pos(&self) -> f64 {
-        if self.motors.is_empty() {
-            return 0.0;
-        }
+    //None if the group is empty or no motor could be read
+    pub fn get_avg_pos(&self) -> Option<f64> {
         let mut sum = 0.0;
         let mut count = 0;
         for m in &self.motors{
-            match m.position() { //when you call position on the motor it returns a box -> which can either be Ok or Err
-                Ok(p) => { //writing cases for whether the value is Ok or Err and working accordingly
-                    sum += p.as_degrees();
-                    count += 1;
-                }
-                Err(_) => continue
+            if let Ok(p) = m.position() {
+                sum += p.as_degrees();
+                count += 1;
             }
         }
-        if count ==0 {
-            return 0.0;
+        if count == 0 {
+            return None;
         }
-        sum / count as f64
+        Some(sum / count as f64)
     }
 
     pub fn get_avg_temp(&self) -> f64 {
