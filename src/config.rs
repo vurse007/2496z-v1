@@ -10,8 +10,8 @@ use crate::pid::PID;
 use crate::util::Constants;
 
 //port numbers -> change these to match the robot
-const LEFT_PORTS: [u8; 3] = [1, 2, 3];
-const RIGHT_PORTS: [u8; 3] = [4, 5, 6];
+const LEFT_PORTS: [u8; 2] = [1, 2];
+const RIGHT_PORTS: [u8; 2] = [4, 5];
 const IMU_PORT: u8 = 7;
 const DRIVE_GEARSET: Gearset = Gearset::Blue;
 
