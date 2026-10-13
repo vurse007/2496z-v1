@@ -11,8 +11,8 @@ use crate::util::Constants;
 
 //port numbers -> change these to match the robot
 const LEFT_PORTS: [u8; 2] = [1, 2];
-const RIGHT_PORTS: [u8; 2] = [4, 5];
-const IMU_PORT: u8 = 7;
+const RIGHT_PORTS: [u8; 2] = [11, 12];
+const IMU_PORT: u8 = 18;
 const DRIVE_GEARSET: Gearset = Gearset::Blue;
 
 fn motor_group(peripherals: &mut DynamicPeripherals, ports: &[u8], direction: Direction) -> MotorGroup {
