@@ -38,7 +38,7 @@ impl Compete for Robot {
             let state = self.controller.state().unwrap_or_default(); //controller disconnected -> all zeros -> robot stops
             self.drive.split_arcade(state.left_stick.y(), state.right_stick.x());
 
-            if state.button_l1.is_pressed() { self.lift.motors.set_voltage(12.0); }
+            if state.button_l1.is_pressed() { self.lift.motors.set_voltage(-12.0); }
             else if state.button_l2.is_pressed() { self.lift.motors.set_voltage(-12.0); }
             else {
                 self.lift.motors.set_voltage(0.0);
