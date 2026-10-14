@@ -60,3 +60,13 @@ impl Timer {
 pub fn get_abs_rot_err(target: f64, current: f64) -> f64 {
     (target - current + 180.0).rem_euclid(360.0) - 180.0
 }
+
+//exponential drive curve -> less sensitive near the center of the stick, still reaches full power at the edge
+//input / output are -1.0 to 1.0. t is the curve strength: 0 = steepest curve, bigger t = closer to linear (the graph's slider, 0-10)
+//same as y = (e^(-t/10) + e^((|x|-127)/10) * (1 - e^(-t/10))) * x with x in -127..127, just scaled to -1..1
+pub fn drive_curve(input: f64, t: f64) -> f64 {
+    let x = input.clamp(-1.0, 1.0) * 127.0;
+    let a = (-t / 10.0).exp();
+    let y = (a + ((x.abs() - 127.0) / 10.0).exp() * (1.0 - a)) * x;
+    y / 127.0
+}

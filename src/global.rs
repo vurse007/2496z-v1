@@ -9,6 +9,17 @@ use vexide::smart::motor::BrakeMode;
 //rule: never hold a .borrow() / .borrow_mut() across an .await -> another task could try to borrow it and panic
 pub type SharedImu = Rc<RefCell<InertialSensor>>;
 
+//calibrates the imu and wraps it -> call once, then .clone() the result for anything that needs it (Rc clones share the same sensor)
+pub async fn calibrate_imu(mut imu: InertialSensor) -> SharedImu {
+    //has to calibrate (~2-3s, robot must be still) before heading() returns anything
+    //done before sharing it, so no borrow is held across the .await
+    if let Err(err) = imu.calibrate().await {
+        println!("IMU failed to calibrate: {err:?}");
+    }
+
+    Rc::new(RefCell::new(imu))
+}
+
 pub struct MotorGroup { //new struct for groups of motors
     motors: Vec<Motor>,
     brake_mode: BrakeMode, //what brake() does -> vexide motors don't store a brake mode, so we store it ourselves

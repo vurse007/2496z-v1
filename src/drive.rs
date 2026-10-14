@@ -1,5 +1,8 @@
 use crate::global::{MotorGroup, SharedImu};
 use crate::pid::PID;
+use crate::util::{drive_curve, Constants};
+
+const DRIVE_CURVE_T: f64 = 2.8; //curve strength -> change to taste (see util::drive_curve)
 
 pub struct Drivetrain {
     pub left: MotorGroup,
@@ -12,14 +15,13 @@ pub struct Drivetrain {
 }
 
 impl Drivetrain {
-    pub fn new(
-        left: MotorGroup,
-        right: MotorGroup,
-        imu: SharedImu,
-        heading_pid: PID,
-        turn_pid: PID,
-        drive_pid: PID,
-    ) -> Self {
+    pub fn new(left: MotorGroup, right: MotorGroup, imu: SharedImu) -> Self {
+        //all pid values below are placeholders -> tune them
+        //PID::new(general, refined, refined_range, settle_range, slew, integral_threshold, max_integral, deadband, settle_time_ms)
+        let heading_pid = PID::new(Constants::new(0.0, 0.0, 0.0), Constants::new(0.0, 0.0, 0.0), 0.0, 0.0, 12.0, 0.0, 0.0, 0.0, 0);
+        let turn_pid = PID::new(Constants::new(0.3, 0.0, 1.0), Constants::new(0.3, 0.0, 1.0), 5.0, 1.0, 12.0, 5.0, 100.0, 0.1, 100);
+        let drive_pid = PID::new(Constants::new(0.0, 0.0, 0.0), Constants::new(0.0, 0.0, 0.0), 0.0, 0.0, 12.0, 0.0, 0.0, 0.0, 0);
+
         Self {
             left,
             right,
@@ -38,8 +40,11 @@ impl Drivetrain {
     }
 
     pub fn split_arcade(&mut self, forward: f64, turn: f64) {
-        let left = forward.clamp(-1.0, 1.0) + turn.clamp(-1.0, 1.0);
-        let right = forward.clamp(-1.0, 1.0) - turn.clamp(-1.0, 1.0);
+        let forward = drive_curve(forward, DRIVE_CURVE_T);
+        let turn = drive_curve(turn, DRIVE_CURVE_T);
+
+        let left = forward + turn;
+        let right = forward - turn;
 
         // Preserve the ratio between the two sides when either exceeds 1.0.
         let max_output = left.abs().max(right.abs()).max(1.0);

@@ -1,55 +1,42 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use vexide::peripherals::DynamicPeripherals;
 use vexide::prelude::*;
+use vexide::smart::SmartPort;
 
-use crate::drive::Drivetrain;
-use crate::global::{MotorGroup, SharedImu};
-use crate::pid::PID;
-use crate::util::Constants;
+use crate::global::MotorGroup;
 
-//port numbers -> change these to match the robot
-const LEFT_PORTS: [u8; 2] = [1, 2];
-const RIGHT_PORTS: [u8; 2] = [11, 12];
-const IMU_PORT: u8 = 18;
-const DRIVE_GEARSET: Gearset = Gearset::Blue;
+use Direction::{Forward, Reverse};
 
-fn motor_group(peripherals: &mut DynamicPeripherals, ports: &[u8], direction: Direction) -> MotorGroup {
-    let motors = ports
-        .iter()
-        .map(|&port| {
-            let port = peripherals
-                .take_smart_port(port)
-                .expect("smart port is already in use"); //crashes on startup if two devices share a port
-            Motor::new(port, DRIVE_GEARSET, direction)
-        })
-        .collect();
-    MotorGroup::new(motors)
+//every device on the robot -> one line each, change ports / gearsets / directions right here
+pub struct Devices {
+    pub left: MotorGroup,
+    pub right: MotorGroup,
+    pub imu: InertialSensor, //not calibrated yet -> see global::calibrate_imu
+    pub lift_motors: MotorGroup,
+    pub lift_rotation: RotationSensor,
+    pub claw: Motor,
+    pub controller: Controller,
 }
 
-//creates and calibrates the imu -> call once, then .clone() the result for anything that needs it (Rc clones share the same sensor)
-pub async fn imu(peripherals: &mut DynamicPeripherals) -> SharedImu {
-    let mut imu = InertialSensor::new(peripherals.take_smart_port(IMU_PORT).expect("smart port is already in use"));
-
-    //has to calibrate (~2-3s, robot must be still) before heading() returns anything
-    //done before sharing it, so no borrow is held across the .await
-    if let Err(err) = imu.calibrate().await {
-        println!("IMU failed to calibrate: {err:?}");
+impl Devices {
+    pub fn new(p: &mut DynamicPeripherals) -> Self {
+        Self {
+            left: motors(p, &[(1, Reverse), (2, Reverse)], Gearset::Blue),
+            right: motors(p, &[(11, Forward), (12, Forward)], Gearset::Blue),
+            imu: InertialSensor::new(port(p, 18)),
+            lift_motors: motors(p, &[(13, Forward), (3, Reverse)], Gearset::Green), //placeholder gearset
+            lift_rotation: RotationSensor::new(port(p, 4), Direction::Forward), 
+            claw: Motor::new(port(p, 21), Gearset::Blue, Reverse),
+            controller: p.take_primary_controller().unwrap(),
+        }
     }
-
-    Rc::new(RefCell::new(imu))
 }
 
-pub fn drivetrain(peripherals: &mut DynamicPeripherals, imu: SharedImu) -> Drivetrain {
-    let left = motor_group(peripherals, &LEFT_PORTS, Direction::Reverse);
-    let right = motor_group(peripherals, &RIGHT_PORTS, Direction::Forward);
+//crashes on startup if two devices share a port
+fn port(p: &mut DynamicPeripherals, num: u8) -> SmartPort {
+    p.take_smart_port(num).expect("smart port is already in use")
+}
 
-    //all pid values below are placeholders -> tune them
-    //PID::new(general, refined, refined_range, settle_range, slew, integral_threshold, max_integral, deadband, settle_time_ms)
-    let heading_pid = PID::new(Constants::new(0.0, 0.0, 0.0), Constants::new(0.0, 0.0, 0.0), 0.0, 0.0, 12.0, 0.0, 0.0, 0.0, 0);
-    let turn_pid = PID::new(Constants::new(0.3, 0.0, 1.0), Constants::new(0.3, 0.0, 1.0), 5.0, 1.0, 12.0, 5.0, 100.0, 0.1, 100);
-    let drive_pid = PID::new(Constants::new(0.0, 0.0, 0.0), Constants::new(0.0, 0.0, 0.0), 0.0, 0.0, 12.0, 0.0, 0.0, 0.0, 0);
-
-    Drivetrain::new(left, right, imu, heading_pid, turn_pid, drive_pid)
+//each motor is (port, direction) -> Reverse flips that one motor
+fn motors(p: &mut DynamicPeripherals, motors: &[(u8, Direction)], gearset: Gearset) -> MotorGroup {
+    MotorGroup::new(motors.iter().map(|&(n, dir)| Motor::new(port(p, n), gearset, dir)).collect())
 }

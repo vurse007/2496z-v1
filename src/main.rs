@@ -6,15 +6,21 @@ use vexide::prelude::*;
 mod config;
 mod drive;
 mod global;
+mod lift;
 mod motion;
 mod pid;
 mod util;
 
 use drive::Drivetrain;
+use lift::Lift;
 
 struct Robot {
     drive: Drivetrain,
     controller: Controller,
+    #[allow(dead_code)] //not used until lift control is written
+    lift: Lift,
+    #[allow(dead_code)] //not used until claw control is written
+    claw: Motor,
 }
 
 impl Compete for Robot {
@@ -28,8 +34,20 @@ impl Compete for Robot {
         loop {
             //tank drive: left stick y -> left side, right stick y -> right side
             let state = self.controller.state().unwrap_or_default(); //controller disconnected -> all zeros -> robot stops
-            self.drive.tank(state.left_stick.y(), state.right_stick.y());
+            self.drive.split_arcade(state.left_stick.y(), state.right_stick.x());
 
+            if state.button_l1.is_pressed() { self.lift.motors.set_voltage(12.0); }
+            else if state.button_l2.is_pressed() { self.lift.motors.set_voltage(-12.0); }
+            else {
+                self.lift.motors.set_voltage(0.0);
+            }
+
+            if state.button_r1.is_pressed() { self.claw.set_voltage(12.0); }
+            else if state.button_r2.is_pressed() { self.claw.set_voltage(-7.0); }
+            else {
+                self.lift.motors.set_voltage(0.0);
+            }
+            
             sleep(Duration::from_millis(10)).await; //always sleep in loops so other tasks get a turn
         }
     }
@@ -39,11 +57,14 @@ impl Compete for Robot {
 async fn main(peripherals: Peripherals) {
     let mut peripherals = DynamicPeripherals::new(peripherals);
 
-    let imu = config::imu(&mut peripherals).await;
-    let drive = config::drivetrain(&mut peripherals, imu.clone()); //odometry will get its own imu.clone() later
-    let controller = peripherals.take_primary_controller().unwrap();
+    let d = config::Devices::new(&mut peripherals);
 
-    let robot = Robot { drive, controller };
+    let imu = global::calibrate_imu(d.imu).await;
+    let drive = Drivetrain::new(d.left, d.right, imu.clone()); //odometry will get its own imu.clone() later
+
+    let lift = Lift::new(d.lift_motors, d.lift_rotation);
+
+    let robot = Robot { drive, lift, claw: d.claw, controller: d.controller };
 
     robot.compete().await;
 }
