@@ -14,14 +14,14 @@ mod pid;
 mod util;
 
 use drive::Drivetrain;
+use global::MotorGroup;
 use lift::Lift;
 
 struct Robot {
     drive: Drivetrain,
     controller: Controller,
-    #[allow(dead_code)] //not used until lift control is written
     lift: Lift,
-    #[allow(dead_code)] //not used until claw control is written
+    intake: MotorGroup,
     claw: Motor,
 }
 
@@ -44,10 +44,18 @@ impl Compete for Robot {
                 self.lift.motors.set_voltage(0.0);
             }
 
-            if state.button_r1.is_pressed() { self.claw.set_voltage(12.0); }
-            else if state.button_r2.is_pressed() { self.claw.set_voltage(-7.0); }
+            //intake: r1 in, r2 out
+            if state.button_r1.is_pressed() { self.intake.set_voltage(12.0); }
+            else if state.button_r2.is_pressed() { self.intake.set_voltage(-12.0); }
             else {
-                self.lift.motors.set_voltage(0.0);
+                self.intake.set_voltage(0.0);
+            }
+
+            //claw: a one way, b the other
+            if state.button_a.is_pressed() { let _ = self.claw.set_voltage(12.0); }
+            else if state.button_b.is_pressed() { let _ = self.claw.set_voltage(-7.0); }
+            else {
+                let _ = self.claw.set_voltage(0.0);
             }
             
             sleep(Duration::from_millis(10)).await; //always sleep in loops so other tasks get a turn
@@ -66,7 +74,7 @@ async fn main(peripherals: Peripherals) {
 
     let lift = Lift::new(d.lift_motors, d.lift_rotation);
 
-    let robot = Robot { drive, lift, claw: d.claw, controller: d.controller };
+    let robot = Robot { drive, lift, intake: d.intake_motors, claw: d.claw, controller: d.controller };
 
     robot.compete().await;
 }

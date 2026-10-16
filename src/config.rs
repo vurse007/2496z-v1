@@ -13,6 +13,7 @@ pub struct Devices {
     pub imu: InertialSensor, //not calibrated yet -> see global::calibrate_imu
     pub lift_motors: MotorGroup,
     pub lift_rotation: RotationSensor,
+    pub intake_motors: MotorGroup,
     pub claw: Motor,
     pub controller: Controller,
 }
@@ -24,8 +25,9 @@ impl Devices {
             right: motors(p, &[(11, Forward), (12, Forward)], Gearset::Blue),
             imu: InertialSensor::new(port(p, 18)),
             lift_motors: motors(p, &[(13, Forward), (3, Reverse)], Gearset::Green), //placeholder gearset
-            lift_rotation: RotationSensor::new(port(p, 4), Direction::Forward), 
-            claw: Motor::new(port(p, 21), Gearset::Blue, Reverse),
+            lift_rotation: RotationSensor::new(port(p, 4), Direction::Forward),
+            intake_motors: motors(p, &[(14, Reverse), (5, Reverse)], Gearset::Green), 
+            claw: Motor::new(port(p, 15), Gearset::Blue, Reverse),
             controller: p.take_primary_controller().unwrap(),
         }
     }
