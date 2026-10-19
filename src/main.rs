@@ -48,8 +48,8 @@ impl Compete for Robot {
                 self.lift.motors.brake();
             }
 
-            //intake: a toggles it on / off
-            if state.button_a.is_now_pressed() { intake_on = !intake_on; }
+            //intake: y toggles it on / off
+            if state.button_y.is_now_pressed() { intake_on = !intake_on; }
             self.intake.set_voltage(if intake_on { 12.0 } else { 0.0 });
 
             //claw: r1 opens, r2 closes
