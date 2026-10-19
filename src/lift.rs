@@ -1,4 +1,5 @@
 use vexide::prelude::RotationSensor;
+use vexide::smart::motor::BrakeMode;
 
 use crate::global::MotorGroup;
 
@@ -8,7 +9,8 @@ pub struct Lift {
 }
 
 impl Lift {
-    pub fn new(motors: MotorGroup, rotation: RotationSensor) -> Self {
+    pub fn new(mut motors: MotorGroup, rotation: RotationSensor) -> Self {
+        motors.set_brake_mode(BrakeMode::Hold); //hold so the lift stays in place when no button is pressed
         Self { motors, rotation }
     }
 }

@@ -43,9 +43,9 @@ impl Compete for Robot {
             self.drive.split_arcade(state.left_stick.y(), state.right_stick.x());
 
             if state.button_l1.is_pressed() { self.lift.motors.set_voltage(12.0); }
-            else if state.button_l2.is_pressed() { self.lift.motors.set_voltage(-12.0); }
+            else if state.button_l2.is_pressed() || state.button_r1.is_pressed() { self.lift.motors.set_voltage(-12.0); }
             else {
-                self.lift.motors.set_voltage(0.0);
+                self.lift.motors.brake();
             }
 
             //intake: a toggles it on / off
@@ -53,7 +53,9 @@ impl Compete for Robot {
             self.intake.set_voltage(if intake_on { 12.0 } else { 0.0 });
 
             //claw: r1 opens, r2 closes
-            if state.button_r1.is_pressed() { let _ = self.claw.set_voltage(12.0); }
+            if state.button_r1.is_pressed() { 
+                let _ = self.claw.set_voltage(12.0);
+            }
             else if state.button_r2.is_pressed() { 
                 let _ = self.claw.set_voltage(-7.0); 
                 let _ = self.intake.set_voltage(-12.0);
