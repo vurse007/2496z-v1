@@ -10,7 +10,7 @@ pub struct Lift {
 
 impl Lift {
     pub fn new(mut motors: MotorGroup, rotation: RotationSensor) -> Self {
-        motors.set_brake_mode(BrakeMode::Hold); //hold so the lift stays in place when no button is pressed
+        motors.set_brake_mode(BrakeMode::Coast); //hold so the lift stays in place when no button is pressed
         Self { motors, rotation }
     }
 }

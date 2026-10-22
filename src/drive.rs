@@ -19,7 +19,7 @@ impl Drivetrain {
         //all pid values below are placeholders -> tune them
         //PID::new(general, refined, refined_range, settle_range, slew, integral_threshold, max_integral, deadband, settle_time_ms)
         let heading_pid = PID::new(Constants::new(0.0, 0.0, 0.0), Constants::new(0.0, 0.0, 0.0), 0.0, 0.0, 12.0, 0.0, 0.0, 0.0, 0);
-        let turn_pid = PID::new(Constants::new(0.3, 0.0, 1.0), Constants::new(0.3, 0.0, 1.0), 5.0, 1.0, 12.0, 5.0, 100.0, 0.1, 100);
+        let turn_pid = PID::new(Constants::new(0.0, 0.0, 0.0), Constants::new(0.0, 0.0, 0.0), 5.0, 1.0, 12.0, 5.0, 100.0, 0.1, 100);
         let drive_pid = PID::new(Constants::new(0.0, 0.0, 0.0), Constants::new(0.0, 0.0, 0.0), 0.0, 0.0, 12.0, 0.0, 0.0, 0.0, 0);
 
         Self {
