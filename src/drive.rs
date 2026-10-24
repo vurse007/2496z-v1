@@ -19,8 +19,10 @@ impl Drivetrain {
         //all pid values below are placeholders -> tune them
         //PID::new(general, refined, refined_range, settle_range, slew, integral_threshold, max_integral, deadband, settle_time_ms)
         let heading_pid = PID::new(Constants::new(0.3, 0.0, 0.0), Constants::new(0.0, 0.0, 0.0), 0.0, 0.0, 12.0, 0.0, 0.0, 0.0, 0);
-        let turn_pid = PID::new(Constants::new(0.6, 0.0, 37.3), Constants::new(0.6, 0.0, 37.3), 3.0, 1.0, 12.0, 5.0, 100.0, 0.0, 300);
-        let drive_pid = PID::new(Constants::new(0.3, 0.0, 35.1), Constants::new(0.05, 0.0, 5.05), 25.0, 5.0, 12.0, 7.0, 100.0, 3.0, 1000);
+        //slew 3.0 / 2.0 = volts per 10ms loop -> full speed in ~40ms / ~60ms instead of instantly (smoother starts, less wheel slip)
+        //settle times: drive was 1000ms = the same as every auton timeout -> it never settled, just buzzed at the target until the timeout
+        let turn_pid = PID::new(Constants::new(0.6, 0.0, 37.3), Constants::new(0.6, 0.0, 37.3), 3.0, 1.0, 3.0, 5.0, 100.0, 0.0, 150);
+        let drive_pid = PID::new(Constants::new(0.3, 0.0, 35.1), Constants::new(0.05, 0.0, 5.05), 25.0, 5.0, 2.0, 7.0, 100.0, 3.0, 200);
 
         Self {
             left,

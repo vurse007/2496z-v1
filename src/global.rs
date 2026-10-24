@@ -16,6 +16,7 @@ pub async fn calibrate_imu(mut imu: InertialSensor) -> SharedImu {
     if let Err(err) = imu.calibrate().await {
         println!("IMU failed to calibrate: {err:?}");
     }
+    let _ = imu.set_data_interval(InertialSensor::MIN_DATA_INTERVAL); //5ms updates -> fresher heading than the 10ms loop, smoother turn derivative
 
     Rc::new(RefCell::new(imu))
 }

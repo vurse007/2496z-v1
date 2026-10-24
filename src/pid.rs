@@ -28,6 +28,9 @@ pub struct PID {
     pub settle_time: u64, //milliseconds
 
     pub settle_timer: Timer,
+
+    pub d_filter: f64, //0.0 = raw derivative, closer to 1.0 = smoother (but laggier) -> stops sensor noise from making the motors buzz
+    pub first_run: bool, //true right after reset() -> skips the derivative on the first loop so the start doesn't get a kick
 }
 
 impl PID {
@@ -52,6 +55,8 @@ impl PID {
             deadband: db,
             settle_time: st,
             settle_timer: Timer::new(st),
+            d_filter: 0.6,
+            first_run: true,
         }
     }
 
@@ -61,8 +66,13 @@ impl PID {
 
         self.error = self.target - self.current;
 
-        if self.error.abs() < self.deadband {
-            self.error = 0.0;
+        //deadband only zeroes the output (further down), it doesn't overwrite the error
+        //-> overwriting it made the error jump to 0 at the edge, which the derivative saw as a big kick -> buzzing at the target
+        let in_deadband = self.error.abs() < self.deadband;
+
+        if self.first_run {
+            self.prev_error = self.error; //no fake jump from 0 to the full error on the first loop
+            self.first_run = false;
         }
 
         let dt = self.dt as f64;
@@ -72,7 +82,10 @@ impl PID {
             self.integral = self.integral.clamp(-self.max_integral, self.max_integral);
         } //no else -> freeze (not reset) integral when out of range
 
-        self.derivative = (self.error - self.prev_error) / dt;
+        //low-pass filtered derivative -> the sensors don't update exactly in sync with the 10ms loop,
+        //so the raw difference jumps between 0 and double, and with a big kd that turns into vibration
+        let raw_derivative = (self.error - self.prev_error) / dt;
+        self.derivative = self.d_filter * self.derivative + (1.0 - self.d_filter) * raw_derivative;
 
         //pick a set of constants
         let c = if self.error.abs() < self.refined_range {
@@ -83,17 +96,22 @@ impl PID {
 
         //scale is a speed limit, 0.0-1.0 like a percent of max speed (12V) -> 0.5 = never more than 6V, gains stay the same
         let max_speed = 12.0 * scale.clamp(0.0, 1.0);
-        let raw_speed = (c.kp * self.error + c.ki * self.integral + c.kd * self.derivative).clamp(-max_speed, max_speed);
-
-        //slew
-        let delta = raw_speed - self.prev_speed;
-        if delta > self.slew {
-            self.speed = self.prev_speed + self.slew;
-        } else if delta < -self.slew {
-            self.speed = self.prev_speed - self.slew;
+        let raw_speed = if in_deadband {
+            0.0
         } else {
-            self.speed = raw_speed;
-        }
+            (c.kp * self.error + c.ki * self.integral + c.kd * self.derivative).clamp(-max_speed, max_speed)
+        };
+
+        //slew -> only limits speeding up (smooth start, less wheel slip)
+        //slowing down / reversing is never limited, otherwise the pid couldn't brake in time and would overshoot
+        let limit = if self.prev_speed == 0.0 {
+            self.slew //starting from a stop -> ramp up from 0
+        } else if raw_speed.signum() == self.prev_speed.signum() {
+            self.prev_speed.abs() + self.slew //same direction -> can only get faster by slew per loop
+        } else {
+            12.0 //flipping direction = braking -> never limited
+        };
+        self.speed = raw_speed.clamp(-limit, limit);
 
         self.prev_error = self.error;
         self.prev_speed = self.speed;
@@ -108,6 +126,7 @@ impl PID {
         self.derivative  = 0.0;
         self.prev_speed  = 0.0;
         self.speed       = 0.0;
+        self.first_run   = true;
         self.settle_timer.stop();
         self.settle_timer.reset();
     }
