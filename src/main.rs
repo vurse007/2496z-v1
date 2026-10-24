@@ -97,6 +97,9 @@ impl Compete for Robot {
             if state.button_y.is_now_pressed() { intake_on = !intake_on; }
             self.intake.set_voltage(if intake_on { 12.0 } else { 0.0 });
 
+            //flipper: d-pad right toggles it on / off
+            if state.button_right.is_now_pressed() { let _ = self.flipper.toggle(); }
+
             //claw: r1 opens, r2 closes
             if state.button_r1.is_pressed() { 
                 let _ = self.claw.set_voltage(12.0);
