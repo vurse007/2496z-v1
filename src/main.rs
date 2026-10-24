@@ -82,6 +82,8 @@ impl Compete for Robot {
         
         let mut intake_on = false;
 
+        let mut flipper_on = false;
+
         loop {
             //tank drive: left stick y -> left side, right stick y -> right side
             let state = self.controller.state().unwrap_or_default(); //controller disconnected -> all zeros -> robot stops
@@ -98,7 +100,9 @@ impl Compete for Robot {
             self.intake.set_voltage(if intake_on { 12.0 } else { 0.0 });
 
             //flipper: d-pad right toggles it on / off
-            if state.button_right.is_now_pressed() { let _ = self.flipper.toggle(); }
+            if state.button_right.is_now_pressed() { flipper_on = !flipper_on; }
+            if flipper_on { let _ = self.flipper.set_high(); }
+            else { let _ = self.flipper.set_low(); }
 
             //claw: r1 opens, r2 closes
             if state.button_r1.is_pressed() { 
