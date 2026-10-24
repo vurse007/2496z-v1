@@ -18,9 +18,9 @@ impl Drivetrain {
     pub fn new(left: MotorGroup, right: MotorGroup, imu: SharedImu) -> Self {
         //all pid values below are placeholders -> tune them
         //PID::new(general, refined, refined_range, settle_range, slew, integral_threshold, max_integral, deadband, settle_time_ms)
-        let heading_pid = PID::new(Constants::new(0.0, 0.0, 0.0), Constants::new(0.0, 0.0, 0.0), 0.0, 0.0, 12.0, 0.0, 0.0, 0.0, 0);
-        let turn_pid = PID::new(Constants::new(0.0, 0.0, 0.0), Constants::new(0.0, 0.0, 0.0), 5.0, 1.0, 12.0, 5.0, 100.0, 0.1, 100);
-        let drive_pid = PID::new(Constants::new(0.0, 0.0, 0.0), Constants::new(0.0, 0.0, 0.0), 0.0, 0.0, 12.0, 0.0, 0.0, 0.0, 0);
+        let heading_pid = PID::new(Constants::new(0.3, 0.0, 0.0), Constants::new(0.0, 0.0, 0.0), 0.0, 0.0, 12.0, 0.0, 0.0, 0.0, 0);
+        let turn_pid = PID::new(Constants::new(0.6, 0.0, 37.3), Constants::new(0.6, 0.0, 37.3), 3.0, 1.0, 12.0, 5.0, 100.0, 0.0, 300);
+        let drive_pid = PID::new(Constants::new(0.3, 0.0, 35.1), Constants::new(0.05, 0.0, 5.05), 25.0, 5.0, 12.0, 7.0, 100.0, 3.0, 1000);
 
         Self {
             left,

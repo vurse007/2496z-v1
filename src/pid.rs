@@ -81,8 +81,9 @@ impl PID {
             &self.general
         };
 
-        //max speed is 12V
-        let raw_speed = (scale * (c.kp * self.error + c.ki * self.integral + c.kd * self.derivative)).clamp(-12.0, 12.0);
+        //scale is a speed limit, 0.0-1.0 like a percent of max speed (12V) -> 0.5 = never more than 6V, gains stay the same
+        let max_speed = 12.0 * scale.clamp(0.0, 1.0);
+        let raw_speed = (c.kp * self.error + c.ki * self.integral + c.kd * self.derivative).clamp(-max_speed, max_speed);
 
         //slew
         let delta = raw_speed - self.prev_speed;

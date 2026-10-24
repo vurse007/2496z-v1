@@ -16,5 +16,6 @@ compress = true
 
 [dependencies]
 vexide = { version = "0.8.0", features = ["full", "default-sdk"] }
+futures-util = { version = "0.3.34", default-features = false, features = ["async-await-macro"] } #for join!() -> run two motions at once in auton
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

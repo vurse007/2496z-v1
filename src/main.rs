@@ -2,6 +2,7 @@ use std::time::Duration;
 
 //Ethan was here
 
+use futures_util::join;
 use vexide::peripherals::DynamicPeripherals;
 use vexide::prelude::*;
 
@@ -23,13 +24,57 @@ struct Robot {
     lift: Lift,
     intake: MotorGroup,
     claw: Motor,
+    flipper: AdiDigitalOut,
+}
+
+//shortcuts so auton doesn't have to pass the controller every time (it's used to show the pid error)
+impl Robot {
+    async fn straight(&mut self, distance: f64, timeout: u64, scale: f64) {
+        self.drive.straight(&mut self.controller, distance, timeout, scale).await;
+    }
+
+    async fn turn_abs(&mut self, target_heading: f64, timeout: u64, scale: f64) {
+        self.drive.turn_abs(&mut self.controller, target_heading, timeout, scale).await;
+    }
+
+    async fn turn_rel(&mut self, target_heading: f64, timeout: u64, scale: f64) {
+        self.drive.turn_rel(&mut self.controller, target_heading, timeout, scale).await;
+    }
 }
 
 impl Compete for Robot {
     async fn autonomous(&mut self) {
         println!("Autonomous!");
 
-        self.drive.straight(300.0, 1000, 1.0).await;
+        join!(
+            self.drive.straight(&mut self.controller, -1120.0, 1000, 0.6),
+            self.lift.move_to(200.0, 1000, 1.0),
+        );
+        let _ = self.flipper.set_high();
+        sleep(Duration::from_millis(500)).await;
+        self.straight(230.0, 1000, 1.0).await;
+        join!(
+            self.drive.turn_abs(&mut self.controller, -56.0, 1000, 1.0),
+            self.lift.move_to(0.0, 1000, 1.0),
+        );
+        let _ = self.claw.set_voltage(12.0);
+        self.straight(-300.0, 1000, 0.5).await;
+        self.turn_abs(-75.0, 1000, 1.0).await;
+        self.straight(-300.0, 1000, 0.3).await;
+        
+
+
+        
+        //self.turn_abs(90.0, 1000, 1.0).await;
+        //self.straight(1000.0, 1000, 1.0).await;
+        //self.turn_rel(90.0, 1000, 1.0).await;
+        // 
+        //drive starts right away, lift starts 0.5s in -> join! waits until both are done
+        //calls self.drive directly (not the self.straight shortcut) so drive and lift can be borrowed at the same time
+        // join!(
+        //     self.drive.straight(&mut self.controller, 2000.0, 1000, 0.1),
+        //     self.lift.move_to(160.0, 1000, 1.0),
+        // );
     }
 
     async fn driver(&mut self) {
@@ -81,7 +126,7 @@ async fn main(peripherals: Peripherals) {
 
     let lift = Lift::new(d.lift_motors, d.lift_rotation);
 
-    let robot = Robot { drive, lift, intake: d.intake_motors, claw: d.claw, controller: d.controller };
+    let robot = Robot { drive, lift, intake: d.intake_motors, claw: d.claw, flipper: d.flipper, controller: d.controller };
 
     robot.compete().await;
 }
