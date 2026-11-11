@@ -16,6 +16,7 @@ pub struct Devices {
     pub lift_rotation: RotationSensor,
     pub intake_motors: MotorGroup,
     pub claw: Motor,
+    pub toggle_motors: MotorGroup, //toggle 1 + toggle 2 -> spin together on one button (see main::driver)
     pub flipper: AdiDigitalOut, //piston
     pub controller: Controller,
 }
@@ -23,13 +24,14 @@ pub struct Devices {
 impl Devices {
     pub fn new(p: &mut DynamicPeripherals) -> Self {
         Self {
-            left: motors(p, &[(1, Reverse), (2, Reverse)], Gearset::Blue),
-            right: motors(p, &[(11, Forward), (12, Forward)], Gearset::Blue),
+            left: motors(p, &[(1, Reverse), (2, Reverse), (6, Reverse)], Gearset::Blue),
+            right: motors(p, &[(11, Forward), (12, Forward), (16, Forward)], Gearset::Blue),
             imu: InertialSensor::new(port(p, 18)),
-            lift_motors: motors(p, &[(13, Forward), (3, Reverse)], Gearset::Green), //placeholder gearset
+            lift_motors: motors(p, &[(13, Forward), (3, Reverse), (7, Forward)], Gearset::Green), //placeholder gearset; port 7 + direction are placeholders -> verify at practice
             lift_rotation: RotationSensor::new(port(p, 4), Direction::Forward),
             intake_motors: motors(p, &[(14, Reverse), (5, Reverse)], Gearset::Green), 
             claw: Motor::new(port(p, 15), Gearset::Blue, Reverse),
+            toggle_motors: motors(p, &[(8, Forward), (9, Forward)], Gearset::Green), //PLACEHOLDER ports / directions / gearset -> hook up at practice
             flipper: AdiDigitalOut::new(adi_port(p, 1)), //adi port A
             controller: p.take_primary_controller().unwrap(),
         }

@@ -24,6 +24,7 @@ struct Robot {
     lift: Lift,
     intake: MotorGroup,
     claw: Motor,
+    toggles: MotorGroup,
     flipper: AdiDigitalOut,
 }
 
@@ -159,6 +160,13 @@ impl Compete for Robot {
                 let _ = self.claw.set_voltage(0.0);
             }
 
+            //toggles: hold A -> toggle 1 + toggle 2 spin together
+            if state.button_a.is_pressed() {
+                self.toggles.set_voltage(12.0);
+            } else {
+                self.toggles.set_voltage(0.0);
+            }
+
             sleep(Duration::from_millis(10)).await; //always sleep in loops so other tasks get a turn
         }
     }
@@ -180,6 +188,7 @@ async fn main(peripherals: Peripherals) {
         lift,
         intake: d.intake_motors,
         claw: d.claw,
+        toggles: d.toggle_motors,
         flipper: d.flipper,
         controller: d.controller,
     };
