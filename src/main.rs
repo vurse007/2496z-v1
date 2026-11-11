@@ -170,6 +170,8 @@ async fn main(peripherals: Peripherals) {
 
     let imu = global::calibrate_imu(d.imu).await;
     let drive = Drivetrain::new(d.left, d.right, imu.clone()); //odometry will get its own imu.clone() later
+    //to test pod feedback: swap the line above for Drivetrain::with_forward_pod(d.left, d.right, imu.clone(), d.forward_pod)
+    //-> use_odom flips on automatically and straight() distances become inches (not motor degrees), so retune the drive PID gains first
 
     let lift = Lift::new(d.lift_motors, None); //no rotation sensor right now -> auton lift moves are skipped
 

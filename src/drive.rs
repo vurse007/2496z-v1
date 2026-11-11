@@ -1,13 +1,20 @@
+use std::f64::consts::PI;
+
+use vexide::prelude::RotationSensor;
+
 use crate::global::{MotorGroup, SharedImu};
 use crate::pid::PID;
 use crate::util::{drive_curve, Constants};
 
 const DRIVE_CURVE_T: f64 = 2.8; //curve strength -> change to taste (see util::drive_curve)
+const FORWARD_POD_WHEEL_DIAMETER_IN: f64 = 2.0; //2in tracking wheel -> pod distance reads in inches
 
 pub struct Drivetrain {
     pub left: MotorGroup,
     pub right: MotorGroup,
     pub imu: SharedImu,
+    pub forward_pod: Option<RotationSensor>, //forward/backward tracking wheel (odom pod)
+    pub use_odom: bool, //true -> drive PID reads the pod, false -> motor encoders (default)
     pub heading_pid: PID,
     pub turn_pid: PID,
     pub drive_pid: PID,
@@ -15,7 +22,19 @@ pub struct Drivetrain {
 }
 
 impl Drivetrain {
+    //no pod -> flag stays off, everything behaves exactly like before
     pub fn new(left: MotorGroup, right: MotorGroup, imu: SharedImu) -> Self {
+        Self::with_optional_pod(left, right, imu, None)
+    }
+
+    //passing the pod in flips use_odom on automatically -> drive PID reads the pod instead of the motor encoders.
+    //call set_use_odom(false) after this if you want the pod wired up but the motors still driving the PID.
+    pub fn with_forward_pod(left: MotorGroup, right: MotorGroup, imu: SharedImu, pod: RotationSensor) -> Self {
+        Self::with_optional_pod(left, right, imu, Some(pod))
+    }
+
+    fn with_optional_pod(left: MotorGroup, right: MotorGroup, imu: SharedImu, pod: Option<RotationSensor>) -> Self {
+        let use_odom = pod.is_some();
         //all pid values below are placeholders -> tune them
         //PID::new(general, refined, refined_range, settle_range, slew, integral_threshold, max_integral, deadband, settle_time_ms)
         //gains are now in textbook units (see pid.rs): kp in V/unit, kd in V/(unit/s) -> old kd / 1000, slew in V/s -> old slew per 10ms loop * 100. kp unchanged, so behaviour is the same as before.
@@ -29,11 +48,18 @@ impl Drivetrain {
             left,
             right,
             imu,
+            forward_pod: pod,
+            use_odom,
             heading_pid,
             turn_pid,
             drive_pid,
             target_heading: 0.0,
         }
+    }
+
+    //manual override for the flag -> flip between pod and motor encoders without rebuilding the drivetrain
+    pub fn set_use_odom(&mut self, use_odom: bool) {
+        self.use_odom = use_odom;
     }
 
     // Inputs are -1.0 to 1.0, like joystick values.
@@ -85,6 +111,27 @@ impl Drivetrain {
         let right = self.get_right_pos()?;
 
         Some((left + right) / 2.0)
+    }
+
+    //forward distance from the pod in inches (2in wheel) -> None if no pod is wired up or the sensor can't be read
+    pub fn get_forward_pod_distance(&self) -> Option<f64> {
+        let pod = self.forward_pod.as_ref()?;
+        let deg = pod.position().ok()?.as_degrees();
+        Some(deg / 360.0 * PI * FORWARD_POD_WHEEL_DIAMETER_IN)
+    }
+
+    //the distance straight() feeds the drive PID:
+    //pod inches when use_odom is on and a pod is wired up, motor-encoder degrees otherwise.
+    //-> the two sources are in different units, so straight() distances are inches with the flag on
+    //   and motor degrees with it off, and the drive PID gains are tuned for degrees -> retune for inches before trusting it.
+    //pod unreadable -> falls back to the motors instead of bailing mid-auton.
+    pub fn get_drive_distance(&self) -> Option<f64> {
+        if self.use_odom {
+            if let Some(d) = self.get_forward_pod_distance() {
+                return Some(d);
+            }
+        }
+        self.get_avg_pos()
     }
 
     // Unchanged, as requested.

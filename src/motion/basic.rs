@@ -77,11 +77,13 @@ impl Drivetrain {
         self.turn_abs(controller, target_heading, timeout, scale).await;
     }
 
+    //distance is in whatever get_drive_distance() returns: motor-encoder degrees when use_odom is off,
+    //pod inches when it's on -> don't mix them up, and retune the drive PID gains for inches before trusting the pod.
     pub async fn straight(&mut self, controller: &mut Controller, distance: f64, timeout: u64, scale: f64) {
         self.drive_pid.reset();
         self.heading_pid.reset();
 
-        let Some(start_distance) = self.get_avg_pos() else {
+        let Some(start_distance) = self.get_drive_distance() else {
             return;
         };
 
@@ -89,7 +91,7 @@ impl Drivetrain {
         safety_timer.start(None);
 
         loop {
-            let Some(current_distance) = self.get_avg_pos() else { //vv next time check the name of the function under the robot object -> you called it get_distance() but it's actually called get_avg_pos()
+            let Some(current_distance) = self.get_drive_distance() else { //pod inches when use_odom is on, motor degrees otherwise
                 break;
             };
 
@@ -130,7 +132,7 @@ impl Drivetrain {
         }
         self.stop();
 
-        let final_error = self.get_avg_pos().map_or(self.drive_pid.error, |p| distance - (p - start_distance));
+        let final_error = self.get_drive_distance().map_or(self.drive_pid.error, |p| distance - (p - start_distance));
         show_final_error(controller, "drive", final_error).await;
     }
 }
