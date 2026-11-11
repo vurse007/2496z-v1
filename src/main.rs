@@ -22,7 +22,6 @@ struct Robot {
     drive: Drivetrain,
     controller: Controller,
     lift: Lift,
-    intake: MotorGroup,
     claw: Motor,
     toggles: MotorGroup,
     flipper: AdiDigitalOut,
@@ -60,7 +59,6 @@ impl Compete for Robot {
         // self.straight(300.0, 1000, 1.0).await;
         // self.straight(-600.0, 1000, 1.0).await;
         
-        self.intake.set_voltage(12.0);
         let _ = self.claw.set_voltage(12.0);
         sleep(Duration::from_millis(400)).await;
         join!(
@@ -123,7 +121,6 @@ impl Compete for Robot {
     async fn driver(&mut self) {
         println!("Driver!");
 
-        let mut intake_on = false;
         loop {
             //tank drive: left stick y -> left side, right stick y -> right side
             let state = self.controller.state().unwrap_or_default(); //controller disconnected -> all zeros -> robot stops
@@ -138,12 +135,6 @@ impl Compete for Robot {
                 self.lift.motors.brake();
             }
 
-            //intake: y toggles it on / off
-            if state.button_y.is_now_pressed() {
-                intake_on = !intake_on;
-            }
-            self.intake.set_voltage(if intake_on { 12.0 } else { 0.0 });
-
             //flipper: d-pad right toggles it on / off
             if state.button_right.is_now_pressed() {
                 let _ = self.flipper.toggle();
@@ -155,13 +146,12 @@ impl Compete for Robot {
                 let _ = self.lift.motors.set_voltage(-12.0);
             } else if state.button_r2.is_pressed() {
                 let _ = self.claw.set_voltage(-7.0);
-                let _ = self.intake.set_voltage(-12.0);
             } else {
                 let _ = self.claw.set_voltage(0.0);
             }
 
-            //toggles: hold A -> toggle 1 + toggle 2 spin together
-            if state.button_a.is_pressed() {
+            //toggles: hold Y -> left + right toggle spin together, same direction
+            if state.button_y.is_pressed() {
                 self.toggles.set_voltage(12.0);
             } else {
                 self.toggles.set_voltage(0.0);
@@ -181,12 +171,11 @@ async fn main(peripherals: Peripherals) {
     let imu = global::calibrate_imu(d.imu).await;
     let drive = Drivetrain::new(d.left, d.right, imu.clone()); //odometry will get its own imu.clone() later
 
-    let lift = Lift::new(d.lift_motors, d.lift_rotation);
+    let lift = Lift::new(d.lift_motors, None); //no rotation sensor right now -> auton lift moves are skipped
 
     let robot = Robot {
         drive,
         lift,
-        intake: d.intake_motors,
         claw: d.claw,
         toggles: d.toggle_motors,
         flipper: d.flipper,

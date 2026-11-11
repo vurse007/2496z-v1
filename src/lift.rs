@@ -13,18 +13,20 @@ const LIFT_KG: f64 = 0.0;
 
 pub struct Lift {
     pub motors: MotorGroup,
-    pub rotation: RotationSensor,
+    pub rotation: Option<RotationSensor>, //None = no sensor on the robot -> pid moves are skipped
     pub pid: PID,
     pub target: f64, //degrees on the rotation sensor
 }
 
 impl Lift {
-    pub fn new(mut motors: MotorGroup, mut rotation: RotationSensor) -> Self {
+    pub fn new(mut motors: MotorGroup, mut rotation: Option<RotationSensor>) -> Self {
         motors.set_brake_mode(BrakeMode::Coast); //hold so the lift stays in place when no button is pressed
 
         //0 = wherever the lift is when the program starts -> start every match with the lift all the way down
-        let _ = rotation.reset_position();
-        let _ = rotation.set_data_interval(RotationSensor::MIN_DATA_INTERVAL); //5ms updates -> fresher readings than the 10ms loop
+        if let Some(rotation) = rotation.as_mut() {
+            let _ = rotation.reset_position();
+            let _ = rotation.set_data_interval(RotationSensor::MIN_DATA_INTERVAL); //5ms updates -> fresher readings than the 10ms loop
+        }
 
         //all pid values below are placeholders -> tune them
         //PID::new(general, refined, refined_range, settle_range, slew, integral_threshold, max_integral, deadband, settle_time_ms)
@@ -34,10 +36,10 @@ impl Lift {
         Self { motors, rotation, pid, target: 0.0 }
     }
 
-    //lift angle in degrees, None if the rotation sensor is unplugged
+    //lift angle in degrees, None if there's no rotation sensor or it's unplugged
     //position() keeps counting past 360 -> use it instead of angle() so the error never wraps
     pub fn get_pos(&self) -> Option<f64> {
-        self.rotation.position().ok().map(|p| p.as_degrees())
+        self.rotation.as_ref()?.position().ok().map(|p| p.as_degrees())
     }
 
     //changes where update() drives the lift to -> doesn't move anything by itself
