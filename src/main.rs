@@ -143,7 +143,7 @@ impl Compete for Robot {
             //claw: r1 opens, r2 closes
             if state.button_r1.is_pressed() {
                 let _ = self.claw.set_voltage(12.0);
-                let _ = self.lift.motors.set_voltage(-12.0);
+                let _ = self.lift.motors.set_voltage(-7.0);
             } else if state.button_r2.is_pressed() {
                 let _ = self.claw.set_voltage(-7.0);
             } else {

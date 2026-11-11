@@ -13,11 +13,9 @@ pub struct Devices {
     pub right: MotorGroup,
     pub imu: InertialSensor, //not calibrated yet -> see global::calibrate_imu
     pub lift_motors: MotorGroup,
-    pub lift_rotation: RotationSensor,
     pub forward_pod: RotationSensor, //forward/backward tracking wheel (odom pod, 2in wheel) -> configured only, no odometry yet
-    pub intake_motors: MotorGroup,
     pub claw: Motor,
-    pub toggle_motors: MotorGroup, //left toggle + right toggle -> spin together on one button (see main::driver)
+    pub toggle_motors: MotorGroup, //toggle 1 + toggle 2 -> spin together on one button (see main::driver)
     pub flipper: AdiDigitalOut, //piston
     pub controller: Controller,
 }
@@ -25,14 +23,13 @@ pub struct Devices {
 impl Devices {
     pub fn new(p: &mut DynamicPeripherals) -> Self {
         Self {
-            left: motors(p, &[(4, Reverse), (10, Reverse)], Gearset::Blue), //front, back
-            right: motors(p, &[(3, Forward), (14, Forward)], Gearset::Blue), //front, back
+            left: motors(p, &[(4, Reverse), (10, Reverse), (21, Reverse)], Gearset::Blue),
+            right: motors(p, &[(3, Forward), (14, Forward), (20, Forward)], Gearset::Blue),
             imu: InertialSensor::new(port(p, 18)),
-            lift_motors: motors(p, &[(13, Forward), (3, Reverse)], Gearset::Green), //placeholder gearset
-            lift_rotation: RotationSensor::new(port(p, 4), Direction::Forward),
-            intake_motors: motors(p, &[(14, Reverse), (5, Reverse)], Gearset::Green), 
-            claw: Motor::new(port(p, 15), Gearset::Blue, Reverse),
-            toggle_motors: motors(p, &[(8, Forward), (9, Forward)], Gearset::Green), //PLACEHOLDER ports / directions / gearset -> hook up at practice
+            lift_motors: motors(p, &[(13, Forward), (1, Forward)], Gearset::Green), //placeholder gearset
+            forward_pod: RotationSensor::new(port(p, 5), Direction::Forward), //PLACEHOLDER port (5 = unused) + direction -> hook up at practice
+            claw: Motor::new(port(p, 11), Gearset::Blue, Forward),
+            toggle_motors: motors(p, &[(6, Forward), (16, Reverse)], Gearset::Green), //PLACEHOLDER ports / directions / gearset -> hook up at practice
             flipper: AdiDigitalOut::new(adi_port(p, 1)), //adi port A
             controller: p.take_primary_controller().unwrap(),
         }
