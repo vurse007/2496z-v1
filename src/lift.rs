@@ -28,7 +28,8 @@ impl Lift {
 
         //all pid values below are placeholders -> tune them
         //PID::new(general, refined, refined_range, settle_range, slew, integral_threshold, max_integral, deadband, settle_time_ms)
-        let pid = PID::new(Constants::new(0.2, 0.0, 0.0), Constants::new(0.2, 0.0, 0.0), 0.0, 2.0, 12.0, 0.0, 0.0, 0.0, 200);
+        //slew is now V/s (see pid.rs) -> 12.0 V/loop = 1200 V/s, same behaviour as before
+        let pid = PID::new(Constants::new(0.2, 0.0, 0.0), Constants::new(0.2, 0.0, 0.0), 0.0, 2.0, 1200.0, 0.0, 0.0, 0.0, 200);
 
         Self { motors, rotation, pid, target: 0.0 }
     }

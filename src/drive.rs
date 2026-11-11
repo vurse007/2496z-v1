@@ -18,11 +18,12 @@ impl Drivetrain {
     pub fn new(left: MotorGroup, right: MotorGroup, imu: SharedImu) -> Self {
         //all pid values below are placeholders -> tune them
         //PID::new(general, refined, refined_range, settle_range, slew, integral_threshold, max_integral, deadband, settle_time_ms)
-        let heading_pid = PID::new(Constants::new(0.3, 0.0, 0.0), Constants::new(0.0, 0.0, 0.0), 0.0, 0.0, 12.0, 0.0, 0.0, 0.0, 0);
-        //slew 3.0 / 2.0 = volts per 10ms loop -> full speed in ~40ms / ~60ms instead of instantly (smoother starts, less wheel slip)
+        //gains are now in textbook units (see pid.rs): kp in V/unit, kd in V/(unit/s) -> old kd / 1000, slew in V/s -> old slew per 10ms loop * 100. kp unchanged, so behaviour is the same as before.
+        let heading_pid = PID::new(Constants::new(0.3, 0.0, 0.0), Constants::new(0.0, 0.0, 0.0), 0.0, 0.0, 1200.0, 0.0, 0.0, 0.0, 0);
+        //slew 300 / 200 V/s -> full speed in ~40ms / ~60ms instead of instantly (smoother starts, less wheel slip)
         //settle times: drive was 1000ms = the same as every auton timeout -> it never settled, just buzzed at the target until the timeout
-        let turn_pid = PID::new(Constants::new(0.6, 0.0, 37.3), Constants::new(0.6, 0.0, 37.3), 3.0, 1.0, 3.0, 5.0, 100.0, 0.0, 150);
-        let drive_pid = PID::new(Constants::new(0.3, 0.0, 35.1), Constants::new(0.05, 0.0, 5.05), 25.0, 5.0, 2.0, 7.0, 100.0, 3.0, 200);
+        let turn_pid = PID::new(Constants::new(0.6, 0.0, 0.0373), Constants::new(0.6, 0.0, 0.0373), 3.0, 1.0, 300.0, 5.0, 100.0, 0.0, 150);
+        let drive_pid = PID::new(Constants::new(0.3, 0.0, 0.0351), Constants::new(0.05, 0.0, 0.00505), 25.0, 5.0, 200.0, 7.0, 100.0, 3.0, 200);
 
         Self {
             left,
