@@ -18,6 +18,7 @@ pub struct Devices {
     pub claw: Motor,
     pub toggle_motors: MotorGroup, //toggle 1 + toggle 2 -> spin together on one button (see main::driver)
     pub flipper: AdiDigitalOut, //piston
+    pub park: AdiDigitalOut, //piston
     pub controller: Controller,
 }
 
@@ -33,6 +34,7 @@ impl Devices {
             claw: Motor::new(port(p, 11), Gearset::Blue, Forward),
             toggle_motors: motors(p, &[(6, Forward), (16, Reverse)], Gearset::Green), //PLACEHOLDER ports / directions / gearset -> hook up at practice
             flipper: AdiDigitalOut::new(adi_port(p, 1)), //adi port A
+            park: AdiDigitalOut::new(adi_port(p, 2)), //adi port B -> PLACEHOLDER, change to the real port
             controller: p.take_primary_controller().unwrap(),
         }
     }

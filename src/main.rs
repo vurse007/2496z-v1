@@ -26,6 +26,7 @@ struct Robot {
     claw: Motor,
     toggles: MotorGroup,
     flipper: AdiDigitalOut,
+    park: AdiDigitalOut,
 }
 
 //shortcuts so auton doesn't have to pass the controller every time (it's used to show the pid error)
@@ -184,9 +185,14 @@ impl Compete for Robot {
                 self.lift.motors.brake();
             }
 
-            //flipper: d-pad right toggles it on / off
-            if state.button_right.is_now_pressed() {
+            //flipper: d-pad left toggles it on / off
+            if state.button_left.is_now_pressed() {
                 let _ = self.flipper.toggle();
+            }
+
+            //park: d-pad right toggles it on / off
+            if state.button_right.is_now_pressed() {
+                let _ = self.park.toggle();
             }
 
             //claw: r1 opens, r2 closes
@@ -230,6 +236,7 @@ async fn main(peripherals: Peripherals) {
         claw: d.claw,
         toggles: d.toggle_motors,
         flipper: d.flipper,
+        park: d.park,
         controller: d.controller,
     };
 
