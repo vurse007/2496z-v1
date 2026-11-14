@@ -13,6 +13,7 @@ pub struct Devices {
     pub right: MotorGroup,
     pub imu: InertialSensor, //not calibrated yet -> see global::calibrate_imu
     pub lift_motors: MotorGroup,
+    pub lift_rotation: RotationSensor, //lift angle for the lift pid (port 8) -> direction must make "lift up" count positive
     pub forward_pod: RotationSensor, //forward/backward tracking wheel (odom pod, 2in wheel) -> configured only, no odometry yet
     pub claw: Motor,
     pub toggle_motors: MotorGroup, //toggle 1 + toggle 2 -> spin together on one button (see main::driver)
@@ -25,8 +26,9 @@ impl Devices {
         Self {
             left: motors(p, &[(4, Reverse), (10, Reverse), (21, Reverse)], Gearset::Blue),
             right: motors(p, &[(3, Forward), (14, Forward), (20, Forward)], Gearset::Blue),
-            imu: InertialSensor::new(port(p, 18)),
+            imu: InertialSensor::new(port(p, 7)),
             lift_motors: motors(p, &[(13, Forward), (1, Forward)], Gearset::Green), //placeholder gearset
+            lift_rotation: RotationSensor::new(port(p, 8), Direction::Reverse), //flip to Reverse if raising the lift reads negative
             forward_pod: RotationSensor::new(port(p, 5), Direction::Forward), //PLACEHOLDER port (5 = unused) + direction -> hook up at practice
             claw: Motor::new(port(p, 11), Gearset::Blue, Forward),
             toggle_motors: motors(p, &[(6, Forward), (16, Reverse)], Gearset::Green), //PLACEHOLDER ports / directions / gearset -> hook up at practice

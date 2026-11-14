@@ -1,16 +1,13 @@
-use std::time::Instant;
-
 use crate::util::Constants;
 use crate::util::Timer;
 
-// Units, so the gains mean the same thing everywhere and match textbooks:
-//   kp: volts per unit of error          (e.g. 0.6 V/deg -> full 12V at 20 deg error)
-//   ki: volts per (unit * second)        (integral is now error * seconds, not error * ms)
-//   kd: volts per (unit / second)        (derivative is now deg/s, not deg/ms)
-//   slew: volts per second               (e.g. 300 V/s -> 0 to 12V in 40ms, same as 3.0 V/loop before)
-//   max_integral: unit * seconds         (e.g. 100 deg*s)
-// Full-power error for a loop is just 12 / kp, so you can tune by
-// "how close before it starts slowing down" instead of by raw kp.
+// Plain per-loop PID (same as the lynx C++ one) -> no dt anywhere, so what you tune is what you get:
+//   kp: volts per unit of error
+//   ki: volts per (unit of error summed every loop)
+//   kd: volts per (unit the error changed since the last loop)
+//   slew: max volts the output can rise per loop (e.g. 3.0 -> 0 to 12V in 4 loops)
+//   max_integral: cap on the summed error (in error units, not volts)
+// Needs the loop to run at a steady rate (the 10ms sleep) -> retune if you change pid.dt.
 pub struct PID {
     pub general: Constants,
     pub refined: Constants,
@@ -21,7 +18,6 @@ pub struct PID {
     pub dt: u64, //nominal loop time in milliseconds (fallback on the first loop)
 
     pub current: f64,
-    pub prev_current: f64,
     pub target: f64,
 
     pub error: f64,
@@ -39,10 +35,7 @@ pub struct PID {
     pub settle_time: u64, //milliseconds
 
     pub settle_timer: Timer,
-    pub last_time: Instant,
 
-    pub d_filter: f64, //0.0 = raw derivative, closer to 1.0 = smoother (but laggier) -> stops sensor noise from making the motors buzz
-    pub first_run: bool, //true right after reset() -> skips the derivative on the first loop so the start doesn't get a kick
 }
 
 impl PID {
@@ -54,7 +47,6 @@ impl PID {
             settle_range: sr,
             dt: 10,
             current: 0.0,
-            prev_current: 0.0,
             target: 0.0,
             error: 0.0,
             prev_error: 0.0,
@@ -68,9 +60,6 @@ impl PID {
             deadband: db,
             settle_time: st,
             settle_timer: Timer::new(st),
-            last_time: Instant::now(),
-            d_filter: 0.6,
-            first_run: true,
         }
     }
 
@@ -79,38 +68,21 @@ impl PID {
         self.current = current;
 
         self.error = self.target - self.current;
+        let raw_error = self.error; //saved before the deadband zeroes it
 
-        //deadband only zeroes the output (further down), it doesn't overwrite the error
-        //-> overwriting it made the error jump to 0 at the edge, which the derivative saw as a big kick -> buzzing at the target
-        let in_deadband = self.error.abs() < self.deadband;
-
-        //real dt in seconds, measured, not assumed 10ms -> sleep + work is usually 12-15ms,
-        //so the old assumed dt made integral/derivative off by 20-50%. clamped so a pause
-        //between loops can't make one giant integral/derivative step.
-        let dt_s = if self.first_run {
-            self.dt as f64 / 1000.0
-        } else {
-            self.last_time.elapsed().as_secs_f64().clamp(0.005, 0.05)
-        };
-        self.last_time = Instant::now();
-
-        if self.first_run {
-            self.prev_error = self.error; //no fake jump from 0 to the full error on the first loop
-            self.prev_current = self.current;
-            self.first_run = false;
+        //deadband: tiny error counts as zero for p and i
+        if self.error.abs() < self.deadband {
+            self.error = 0.0;
         }
 
+        //integral: summed every loop, clamped, frozen (not reset) outside the threshold
         if self.error.abs() < self.integral_threshold {
-            self.integral += ((self.error + self.prev_error) / 2.0) * dt_s;
+            self.integral += (self.error + self.prev_error) / 2.0;
             self.integral = self.integral.clamp(-self.max_integral, self.max_integral);
-        } //no else -> freeze (not reset) integral when out of range
+        }
 
-        //derivative on measurement, not on error: same value when the target is
-        //constant (the usual case), but no kick when the target changes.
-        //low-pass filtered -> the sensors don't update exactly in sync with the 10ms loop,
-        //so the raw difference jumps between 0 and double, and with a big kd that turns into vibration
-        let raw_derivative = -(self.current - self.prev_current) / dt_s;
-        self.derivative = self.d_filter * self.derivative + (1.0 - self.d_filter) * raw_derivative;
+        //derivative uses the raw error so it tapers smoothly into the deadband
+        self.derivative = raw_error - self.prev_error;
 
         //pick a set of constants
         let c = if self.error.abs() < self.refined_range {
@@ -121,42 +93,32 @@ impl PID {
 
         //scale is a speed limit, 0.0-1.0 like a percent of max speed (12V) -> 0.5 = never more than 6V, gains stay the same
         let max_speed = 12.0 * scale.clamp(0.0, 1.0);
-        let raw_speed = if in_deadband {
-            0.0
-        } else {
-            (c.kp * self.error + c.ki * self.integral + c.kd * self.derivative).clamp(-max_speed, max_speed)
-        };
+        let raw_speed = c.kp * self.error + c.ki * self.integral + c.kd * self.derivative;
 
-        //slew -> only limits speeding up (smooth start, less wheel slip)
-        //slowing down / reversing is never limited, otherwise the pid couldn't brake in time and would overshoot
-        //slew is now V/s, so the per-loop step is slew * dt_s
-        let step = self.slew * dt_s;
-        let limit = if self.prev_speed == 0.0 {
-            step //starting from a stop -> ramp up from 0
-        } else if raw_speed.signum() == self.prev_speed.signum() {
-            self.prev_speed.abs() + step //same direction -> can only get faster by slew per loop
+        //slew: output can change by at most `slew` volts per loop (both directions, like the lynx one)
+        let delta = raw_speed - self.prev_speed;
+        self.speed = if delta > self.slew {
+            self.prev_speed + self.slew
+        } else if delta < -self.slew {
+            self.prev_speed - self.slew
         } else {
-            12.0 //flipping direction = braking -> never limited
+            raw_speed
         };
-        self.speed = raw_speed.clamp(-limit, limit);
+        self.speed = self.speed.clamp(-max_speed, max_speed);
 
-        self.prev_error = self.error;
-        self.prev_current = self.current;
+        self.prev_error = raw_error; //raw, so the next derivative is right
         self.prev_speed = self.speed;
 
-        self.speed //return speed
+        self.speed
     }
 
     pub fn reset(&mut self) {
         self.error       = 0.0;
         self.prev_error  = 0.0;
-        self.prev_current = 0.0;
         self.integral    = 0.0;
         self.derivative  = 0.0;
         self.prev_speed  = 0.0;
         self.speed       = 0.0;
-        self.first_run   = true;
-        self.last_time   = Instant::now();
         self.settle_timer.stop();
         self.settle_timer.reset();
     }

@@ -26,8 +26,38 @@ fn error_text(label: &str, error: f64) -> String {
     format!("{:<19}", format!("{label} err: {error:.2}"))
 }
 
+//which side of the chassis drives during a turn
+//Both = normal point turn, Left/Right = swing turn (only that side spins, the other side holds still)
+#[derive(Clone, Copy, PartialEq)]
+pub enum SwingSide {
+    Both,
+    Left,
+    Right,
+}
+
 impl Drivetrain {
     pub async fn turn_abs(&mut self, controller: &mut Controller, target_heading: f64, timeout: u64, scale: f64) {
+        self.turn_to(controller, target_heading, timeout, scale, SwingSide::Both).await;
+    }
+
+    pub async fn turn_rel(&mut self, controller: &mut Controller, target_heading: f64, timeout: u64, scale: f64) {
+        let current_heading = self.get_heading().unwrap_or(self.target_heading);
+        let target_heading = (target_heading + current_heading).rem_euclid(360.0);
+        self.turn_abs(controller, target_heading, timeout, scale).await;
+    }
+
+    //swing turn: same as turn_abs but only `side` spins. side = the driven side (Left swing pivots around the right wheels)
+    pub async fn swing_abs(&mut self, controller: &mut Controller, side: SwingSide, target_heading: f64, timeout: u64, scale: f64) {
+        self.turn_to(controller, target_heading, timeout, scale, side).await;
+    }
+
+    pub async fn swing_rel(&mut self, controller: &mut Controller, side: SwingSide, target_heading: f64, timeout: u64, scale: f64) {
+        let current_heading = self.get_heading().unwrap_or(self.target_heading);
+        let target_heading = (target_heading + current_heading).rem_euclid(360.0);
+        self.swing_abs(controller, side, target_heading, timeout, scale).await;
+    }
+
+    async fn turn_to(&mut self, controller: &mut Controller, target_heading: f64, timeout: u64, scale: f64, side: SwingSide) {
         self.turn_pid.reset();
 
         let mut safety_timer = Timer::new(timeout);
@@ -42,7 +72,12 @@ impl Drivetrain {
 
             let turn_speed = self.turn_pid.calculate(heading_error, 0.0, scale);
 
-            self.move_raw(turn_speed, -turn_speed); //pid output is already in volts
+            //pid output is already in volts
+            match side {
+                SwingSide::Both => self.move_raw(turn_speed, -turn_speed),
+                SwingSide::Left => self.move_raw(turn_speed, 0.0),
+                SwingSide::Right => self.move_raw(0.0, -turn_speed),
+            }
             show_error(controller, "turn", heading_error);
 
             //settling conditions
@@ -69,12 +104,6 @@ impl Drivetrain {
 
         let final_error = self.get_heading().map_or(self.turn_pid.error, |h| util::get_abs_rot_err(target_heading, h));
         show_final_error(controller, "turn", final_error).await;
-    }
-
-    pub async fn turn_rel(&mut self, controller: &mut Controller, target_heading: f64, timeout: u64, scale: f64) {
-        let current_heading = self.get_heading().unwrap_or(self.target_heading);
-        let target_heading = (target_heading + current_heading).rem_euclid(360.0);
-        self.turn_abs(controller, target_heading, timeout, scale).await;
     }
 
     //distance is in whatever get_drive_distance() returns: motor-encoder degrees when use_odom is off,

@@ -31,7 +31,7 @@ impl Lift {
         //all pid values below are placeholders -> tune them
         //PID::new(general, refined, refined_range, settle_range, slew, integral_threshold, max_integral, deadband, settle_time_ms)
         //slew is now V/s (see pid.rs) -> 12.0 V/loop = 1200 V/s, same behaviour as before
-        let pid = PID::new(Constants::new(0.2, 0.0, 0.0), Constants::new(0.2, 0.0, 0.0), 0.0, 2.0, 1200.0, 0.0, 0.0, 0.0, 200);
+        let pid = PID::new(Constants::new(0.2, 0.0, 0.0), Constants::new(0.2, 0.0, 0.0), 0.0, 2.0, 12.0, 0.0, 0.0, 0.0, 200);
 
         Self { motors, rotation, pid, target: 0.0 }
     }
@@ -48,6 +48,15 @@ impl Lift {
             self.pid.reset(); //new target -> clear old integral / derivative
         }
         self.target = target;
+    }
+
+    //raw voltage control (-12 to 12), bypasses the pid -> for manual driving or quick tests
+    //also sets target to the current position so a later update() holds here instead of snapping back to an old target
+    pub fn set_voltage(&mut self, volts: f64) {
+        if let Some(current) = self.get_pos() {
+            self.target = current;
+        }
+        self.motors.set_voltage(volts.clamp(-12.0, 12.0));
     }
 
     //one pid step toward self.target -> call this every loop (driver) to hold or move the lift without blocking
