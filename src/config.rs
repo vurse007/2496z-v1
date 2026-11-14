@@ -34,7 +34,7 @@ impl Devices {
             claw: Motor::new(port(p, 11), Gearset::Blue, Forward),
             toggle_motors: motors(p, &[(6, Forward), (16, Reverse)], Gearset::Green), //PLACEHOLDER ports / directions / gearset -> hook up at practice
             flipper: AdiDigitalOut::new(adi_port(p, 1)), //adi port A
-            park: AdiDigitalOut::new(adi_port(p, 2)), //adi port B -> PLACEHOLDER, change to the real port
+            park: AdiDigitalOut::new(adi_port(p, 8)), //adi port H
             controller: p.take_primary_controller().unwrap(),
         }
     }
